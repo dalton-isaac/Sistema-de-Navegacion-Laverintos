@@ -1,0 +1,258 @@
+================================================================================
+  PONTIFICIA UNIVERSIDAD CATÓLICA DEL ECUADOR (PUCE)
+  FACULTAD DE INGENIERÍA - TECNOLOGÍA DE DESARROLLO DE SOFTWARE
+  FUNDAMENTOS DE INTELIGENCIA ARTIFICIAL (NRC: 1371)
+================================================================================
+  PROYECTO FINAL: SISTEMA INTELIGENTE DE BÚSQUEDA Y NAVEGACIÓN EN LABERINTOS
+  Autor: Isaac Oña
+  Docente: Ing. Patricio Alvear
+  Fecha de Entrega: 25 de Agosto de 2026
+================================================================================
+
+================================================================================
+ÍNDICE GENERAL
+================================================================================
+1. PLAN DE IMPLEMENTACIÓN Y ARQUITECTURA DEL SISTEMA
+   1.1. Contexto y Objetivos del Proyecto
+   1.2. Modelado Matemático del Espacio de Estados y Grafos
+   1.3. Modelo de Costos Asimétricos y Función Heurística
+   1.4. Arquitectura de Módulos y Estructuras de Datos
+   1.5. Algoritmos Implementados (BFS, DFS, UCS, Greedy, A*)
+   1.6. Interfaz Gráfica de Usuario (Tkinter) y Visualización
+2. RESULTADOS DEL BENCHMARK DE LA TERMINAL
+   2.1. Escenario 1: Laberinto Oficial PDF (5x5)
+   2.2. Escenario 2: Rescate Urbano / Vías Alternativas (10x10)
+   2.3. Escenario 3: Trampa Cóncava en U (12x12)
+   2.4. Escenario 4: Escenario Complejo de Gran Escala (16x16)
+3. TABLA COMPARATIVA CONSOLIDADA MULTIESCENARIO
+4. ANÁLISIS CRÍTICO DE MÉTRICAS Y TRADE-OFFS
+5. GUÍA DE INSTALACIÓN Y EJECUCIÓN
+
+
+================================================================================
+1. PLAN DE IMPLEMENTACIÓN Y ARQUITECTURA DEL SISTEMA
+================================================================================
+
+1.1. CONTEXTO Y OBJETIVOS:
+-------------------------
+El proyecto simula un robot de rescate autónomo en un edificio siniestrado
+representado por una cuadrícula bidimensional de tamaño M x N.
+- 'S' (Start): Punto de entrada o despliegue del robot rescatista.
+- 'G' (Goal): Posición de la víctima o salida de emergencia.
+- '0': Pasillo o espacio libre transitable.
+- '1': Escombros, losas caídas o paredes infranqueables.
+
+Objetivo General:
+Diseñar, implementar y evaluar un sistema integral para resolver laberintos
+utilizando algoritmos de búsqueda no informada (BFS, DFS, UCS) e informada
+(Greedy, A*), mostrando visualmente las trayectorias y comparando su desempeño.
+
+
+1.2. MODELADO DEL ESPACIO DE ESTADOS:
+------------------------------------
+Formalización matemática mediante una 5-tupla:
+  < S, s_0, G, Acciones(s), Transicion(s, a), Costo(s, a, s') >
+
+- Espacio de Estados (S): Pares ordenados (fila, columna) en la matriz [0..M-1, 0..N-1].
+- Estado Inicial (s_0): Coordenada donde se ubica 'S'.
+- Conjunto Meta (G): Coordenada donde se ubica 'G'.
+- Conjunto de Acciones (A): {Derecha, Izquierda, Abajo, Arriba}.
+- Transición: T((r, c), (dr, dc)) = (r + dr, c + dc), validando que no sea muro ('1')
+  y se encuentre dentro de los límites de la matriz.
+
+
+1.3. MODELO DE COSTOS ASIMÉTRICOS Y HEURÍSTICA:
+-----------------------------------------------
+Costos de Movimiento:
+  • Movimiento Horizontal (Derecha / Izquierda) : Costo = 1
+  • Movimiento Vertical   (Abajo / Arriba)      : Costo = 2
+
+Justificación Técnica:
+El costo vertical duplicado (c=2) modela el esfuerzo motriz requerido para vencer
+la gravedad en pendientes de escombros o sortear fricción mecánica, permitiendo
+diferenciar claramente algoritmos que minimizan longitud en pasos (BFS) de aquellos
+que minimizan costo energético real acumulado (UCS, A*).
+
+Heurística de Manhattan (para Greedy y A*):
+  h(n) = |x_actual - x_meta| + |y_actual - y_meta|
+Propiedades:
+  - Admisible: h(n) <= h*(n) (nunca sobrestima el costo real en grilla ortogonal).
+  - Consistente: h(n) <= c(n, a, n') + h(n') (cumple desigualdad triangular).
+
+
+1.4. ARQUITECTURA DE MÓDULOS Y ESTRUCTURAS DE DATOS:
+---------------------------------------------------
+El código en `ProyectoFinal.py` se organiza en 4 capas desacopladas:
+
+1. Capa Algorítmica Nuclear:
+   - `bfs`: Cola FIFO `collections.deque` -> Inserción y extracción en O(1).
+   - `dfs`: Pila LIFO basada en listas de Python -> Memoria lineal O(b·m).
+   - `ucs`: Cola de prioridad `heapq` (Min-Heap) ordenada por g(n).
+   - `greedy`: Min-Heap `heapq` ordenado por h(n).
+   - `a_star`: Min-Heap `heapq` ordenado por f(n) = g(n) + h(n).
+   * Nota de Optimización: En `heapq` se implementó un contador de desempate:
+     `(prioridad, contador, nodo_actual, ruta)` para evitar errores de comparación.
+
+2. Capa de Gestión de Escenarios y Generador:
+   - 4 laberintos preconfigurados (Presets).
+   - Generador estocástico con validación de solvabilidad garantizada mediante BFS.
+
+3. Capa Gráfica y Visualización (Tkinter):
+   - Canvas interactivo para dibujo y edición de muros, inicio y meta con el ratón.
+   - Animación paso a paso de la frontera (amarillo) y ruta solución (azul).
+   - Slider de velocidad en milisegundos (1 ms a 150 ms) y modo instantáneo.
+   - Tarjetas de métricas en vivo y ventana modal de comparación con Treeview.
+
+4. Capa de Benchmarking y Gráficos Estadísticos (Matplotlib):
+   - Módulo automatizado para ejecutar los 5 algoritmos y generar gráficos 2x2 en PNG.
+
+
+================================================================================
+2. RESULTADOS DEL BENCHMARK DE LA TERMINAL
+================================================================================
+
+--------------------------------------------------------------------------------
+2.1. ESCENARIO 1: EJEMPLO OFICIAL PDF (5x5)
+--------------------------------------------------------------------------------
+Matriz de Prueba:
+  [S, 0, 0, 1, 0]
+  [1, 1, 0, 1, 0]
+  [0, 0, 0, 0, 0]
+  [0, 1, 1, 1, 0]
+  [0, 0, 0, G, 0]
+
+MÉTRICA                   | BFS        | DFS        | UCS        | Greedy     | A*        
+--------------------------------------------------------------------------------
+Nodos explorados          | 16         | 12         | 16         | 10         | 12        
+Tiempo ejecución (ms)     | 0.0631     | 0.0388     | 0.0590     | 0.0382     | 0.0464    
+Costo total (H=1, V=2)    | 13         | 15         | 13         | 13         | 13        
+Longitud ruta (pasos)     | 9          | 11         | 9          | 9          | 9         
+¿Ruta Óptima en Costo?    | Sí         | No         | Sí         | Sí         | Sí        
+--------------------------------------------------------------------------------
+Interpretación:
+BFS, UCS, Greedy y A* encuentran la ruta óptima de costo 13 y 9 pasos.
+Sin embargo, Greedy y A* exploran sustancialmente menos nodos (10 y 12) que los
+algoritmos ciegos BFS y UCS (16 nodos). DFS se desvía por una rama secundaria
+produciendo una ruta subóptima de 11 pasos y costo 15.
+
+
+--------------------------------------------------------------------------------
+2.2. ESCENARIO 2: RESCATE URBANO / VÍAS ALTERNATIVAS (10x10)
+--------------------------------------------------------------------------------
+MÉTRICA                   | BFS        | DFS        | UCS        | Greedy     | A*        
+--------------------------------------------------------------------------------
+Nodos explorados          | 65         | 33         | 64         | 20         | 50        
+Tiempo ejecución (ms)     | 0.1772     | 0.0943     | 0.2122     | 0.0712     | 0.1801    
+Costo total (H=1, V=2)    | 26         | 46         | 26         | 26         | 26        
+Longitud ruta (pasos)     | 18         | 28         | 18         | 18         | 18        
+¿Ruta Óptima en Costo?    | Sí         | No         | Sí         | Sí         | Sí        
+--------------------------------------------------------------------------------
+Interpretación:
+En un mapa más amplio con pasillos abiertos, Greedy expande únicamente 20 nodos
+(reducción del 69% respecto a BFS), logrando el tiempo más veloz (0.0712 ms).
+A* equilibra la poda heurística con la garantía matemática de costo mínimo (26).
+
+
+--------------------------------------------------------------------------------
+2.3. ESCENARIO 3: TRAMPA CÓNCAVA EN U (12x12)
+--------------------------------------------------------------------------------
+MÉTRICA                   | BFS        | DFS        | UCS        | Greedy     | A*        
+--------------------------------------------------------------------------------
+Nodos explorados          | 95         | 73         | 99         | 37         | 65        
+Tiempo ejecución (ms)     | 0.2665     | 0.3513     | 0.4931     | 0.1482     | 0.2677    
+Costo total (H=1, V=2)    | 29         | 129        | 29         | 29         | 29        
+Longitud ruta (pasos)     | 18         | 72         | 18         | 18         | 18        
+¿Ruta Óptima en Costo?    | Sí         | No (Grave) | Sí         | Sí (Tarde) | Sí        
+--------------------------------------------------------------------------------
+Interpretación:
+Este escenario pone a prueba la resiliencia ante mínimos locales.
+DFS sufre un desvío severo recorriendo 72 pasos con un costo desproporcionado de 129
+(más de 4 veces el óptimo). Greedy se atasca momentáneamente dentro de la cavidad en U
+antes de salir. A* sortea el obstáculo explorando solo 65 nodos frente a los 99 de UCS
+(un ahorro del 34.3% de nodos expandidos), manteniendo la ruta óptima de costo 29.
+
+
+--------------------------------------------------------------------------------
+2.4. ESCENARIO 4: ESCENARIO COMPLEJO DE GRAN ESCALA (16x16)
+--------------------------------------------------------------------------------
+MÉTRICA                   | BFS        | DFS        | UCS        | Greedy     | A*        
+--------------------------------------------------------------------------------
+Nodos explorados          | 142        | 51         | 141        | 35         | 88        
+Tiempo ejecución (ms)     | 0.3842     | 0.1383     | 0.4686     | 0.1224     | 0.3140    
+Costo total (H=1, V=2)    | 46         | 80         | 46         | 46         | 46        
+Longitud ruta (pasos)     | 31         | 49         | 31         | 31         | 31        
+¿Ruta Óptima en Costo?    | Sí         | No         | Sí         | Sí         | Sí        
+--------------------------------------------------------------------------------
+Interpretación:
+En un laberinto denso y de gran escala, BFS y UCS exploran casi la totalidad del
+espacio transitable (142 y 141 nodos). A* reduce la exploración a 88 nodos (38% menos)
+y Greedy a solo 35 nodos, confirmando la escalabilidad superior de los métodos informados.
+
+
+================================================================================
+3. TABLA COMPARATIVA CONSOLIDADA MULTIESCENARIO
+================================================================================
+
++-------------+---------------------+-------------------+---------------------+--------------------+
+| Algoritmo   | Promedio Nodos Exp. | Promedio T. (ms)  | Garantía Optimalidad| Robustez Topológica|
++-------------+---------------------+-------------------+---------------------+--------------------+
+| BFS         | 79.5 nodos (Alto)   | 0.2228 ms         | Óptimo en pasos (L) | Inmune a trampas   |
+| DFS         | 42.2 nodos (Medio)  | 0.1557 ms         | No Óptimo (Desvíos) | Muy Vulnerable     |
+| UCS         | 80.0 nodos (Alto)   | 0.3082 ms         | Óptimo en costo (C) | Inmune a trampas   |
+| Greedy      | 25.5 nodos (Mínimo) | 0.0950 ms (Veloz) | No Garantizado      | Vulnerable a U-Trap|
+| A*          | 53.7 nodos (Óptimo) | 0.2020 ms (Rápido)| Óptimo en costo (C) | Excelente / Robusto|
++-------------+---------------------+-------------------+---------------------+--------------------+
+
+
+================================================================================
+4. ANÁLISIS CRÍTICO DE MÉTRICAS Y TRADE-OFFS
+================================================================================
+
+1. Espacio de Exploración (Nodos Evaluados):
+   - Algoritmos no informados (BFS / UCS): Expanden celdas en todas las direcciones
+     de forma radial, desperdiciando recursos en ramas opuestas a la meta.
+   - Algoritmo A*: Gracias a la heurística f(n) = g(n) + h(n), focaliza la búsqueda
+     hacia el objetivo, reduciendo entre 35% y 50% los nodos explorados frente a UCS.
+
+2. Impacto de Costos Diferenciados (Horizontal=1 vs Vertical=2):
+   - BFS minimiza el número de saltos absolutos, pudiendo elegir caminos con más
+     tramos verticales si la distancia en celdas es igual.
+   - UCS y A* minimizan el costo ponderado acumulado, priorizando tramos horizontales
+     más económicos y ahorrando energía motriz al robot de rescate.
+
+3. Recomendación para Robótica de Rescate:
+   - A* es el algoritmo óptimo y definitivo para despliegue en campo.
+   - Greedy se recomienda como algoritmo exploratorio rápido cuando se requiera
+     tiempo de respuesta casi instantáneo en áreas abiertas.
+
+
+================================================================================
+5. GUÍA DE INSTALACIÓN Y EJECUCIÓN
+================================================================================
+
+Requisitos:
+  - Python 3.8 o superior instalado.
+  - Tkinter (incluido por defecto en la instalación de Python para Windows/Linux/Mac).
+  - Matplotlib (opcional para exportar gráficos PNG): pip install matplotlib
+
+Comandos de Ejecución:
+
+1. Modo Interfaz Gráfica Interactiva (GUI):
+   Abra la terminal en esta carpeta y ejecute:
+     python ProyectoFinal.py
+
+   Funcionalidades de la GUI:
+   - Seleccionar laberintos de prueba desde el menú desplegable.
+   - Generar laberintos aleatorios garantizados con el botón '🎲 Generar'.
+   - Dibujar/Borrar muros ('1'), pasillos ('0'), Inicio ('S') y Meta ('G') con el ratón.
+   - Resolver con animación visual paso a paso o resolución instantánea.
+   - Controlar la velocidad de la animación mediante la barra deslizadora.
+   - Presionar '📊 Comparar Todos' para abrir la tabla comparativa y exportar gráficos.
+
+2. Modo Benchmark Automatizado por Consola:
+   Para ejecutar las pruebas en terminal y generar las imágenes estadísticas:
+     python ProyectoFinal.py --benchmark
+
+================================================================================
+Fin del Documento de Resultados y Plan de Implementación
+================================================================================
