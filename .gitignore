@@ -1,8 +1,12 @@
-# Python
+# Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
 *$py.class
+
+# C extensions
 *.so
+
+# Distribution / packaging
 .Python
 build/
 develop-eggs/
@@ -26,14 +30,16 @@ env/
 ENV/
 .venv/
 
-# IDEs & Editors
+# IDEs and Editors
 .vscode/
 .idea/
 *.swp
 *.swo
 
-# OS & Office specific
+# Operating System & Office Temporary Locks
 ~$*
+~$*.docx
+~$*.doc
 Thumbs.db
 ehthumbs.db
 Desktop.ini
